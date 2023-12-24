@@ -1,7 +1,7 @@
-from rubpy import Client, handlers
-from rubpy.structs import Struct
+from rubpy import Client
+from rubpy.types import Updates
 from httpx import AsyncClient, ReadTimeout
-from asyncio import run, create_task, sleep as aiosleep
+from asyncio import create_task, sleep as aiosleep
 
 # Initialize an empty list to store responses
 response_queue: list = []
@@ -10,11 +10,11 @@ http_client = AsyncClient()
 # List of group IDs to filter messages from
 groups = ['g0CytnM03bdc3d548fac7e6e42fc0507']
 
-async def message_updates_model(message: Struct, result):
+async def message_updates_model(message: Updates, result):
     # Custom model to handle message updates for User messages
     return message.action == 'New' and message.type == 'User'
 
-async def message_updates_group_model(message: Struct, result):
+async def message_updates_group_model(message: Updates, result):
     # Custom model to handle message updates for Group messages in specified groups
     return message.action == 'New' and message.type == 'Group' and message.object_guid in groups
 
@@ -60,7 +60,7 @@ async def reply_to_user(client: Client, object_guid: str, text: str, message_id:
         except:
             return await client.send_message(object_guid, '**● پاسخ چت‌جی‌پی‌تی:**\nخطایی رخ داد!')
 
-async def handler_message_updates(client: Client, update: Struct):
+async def handler_message_updates(client: Client, update: Updates):
     object_guid: str = update.object_guid
     message_id: str = update.message_id
     text: str = update.raw_text
@@ -68,7 +68,7 @@ async def handler_message_updates(client: Client, update: Struct):
     if isinstance(text, str):
         response_queue.append(reply_to_user(client, object_guid, text, message_id))
 
-async def handler_message_group_updates(client: Client, update: Struct):
+async def handler_message_group_updates(client: Client, update: Updates):
     object_guid: str = update.object_guid
     message_id: str = update.message_id
     text: str = update.raw_text
@@ -77,18 +77,21 @@ async def handler_message_group_updates(client: Client, update: Struct):
         if text.startswith('//'):
             response_queue.append(reply_to_user(client, object_guid, text[2:].strip(), message_id))
 
-async def main():
-    create_task(chooser())
+# async def main():
+#     create_task(chooser())
 
-    async with Client('bot') as client:
-        @client.on(handlers.MessageUpdates(message_updates_model))
-        async def updates(update: Struct):
-            create_task(handler_message_updates(client, update))
+bot = Client('bot')
 
-        @client.on(handlers.MessageUpdates(message_updates_group_model))
-        async def updates(update: Struct):
-            create_task(handler_message_group_updates(client, update))
+@bot.on_message_updates(message_updates_model)
+async def updates(update: Updates):
+    if not hasattr(bot, 'maked_chooser'):
+        create_task(chooser())
+        bot.maked_chooser = True
 
-        await client.run_until_disconnected()
+    create_task(handler_message_updates(bot, update))
 
-run(main())
+@bot.on_message_updates(message_updates_group_model)
+async def updates(update: Updates):
+    create_task(handler_message_group_updates(bot, update))
+
+bot.run()
