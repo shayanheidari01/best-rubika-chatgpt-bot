@@ -8,7 +8,7 @@ response_queue: list = []
 http_client = AsyncClient()
 
 # List of group IDs to filter messages from
-groups = ['g0CytnM03bdc3d548fac7e6e42fc0507']
+groups = []
 
 async def message_updates_model(message: Updates, result):
     # Custom model to handle message updates for User messages
